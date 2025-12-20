@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { Object3D, SphereGeometry, PointLight, Mesh, Group } from '../utils/three';
+import { Object3D, SphereGeometry, PointLight, Mesh, Group } from 'three';
 import SceneComponent from './interfaces/SceneComponent';
 import SatelliteOrbitScene from './SatelliteOrbitScene';
 

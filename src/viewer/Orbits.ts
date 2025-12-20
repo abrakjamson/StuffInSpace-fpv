@@ -1,4 +1,4 @@
-import { LineBasicMaterial, Color, Line, BufferGeometry, Float32BufferAttribute, Group } from '../utils/three';
+import { LineBasicMaterial, Color, Line, BufferGeometry, Float32BufferAttribute, Group } from 'three';
 import SceneComponent from './interfaces/SceneComponent';
 import OrbitCalculationWorker from './workers/OrbitCalculationWorker?worker';
 import SatelliteGroup from './SatelliteGroup';

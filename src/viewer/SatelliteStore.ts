@@ -2,13 +2,33 @@ import axios from 'axios';
 import EventManager from '../utils/event-manager';
 import logger from '../utils/logger';
 import { SatelliteObject } from './interfaces/SatelliteObject';
+import { ensureJsDate } from '@/utils/dateUtils';
 
-const config = {
+type TLE = unknown;
+
+type attributedTLE = {
+  source: {
+    name: string;
+    url: string;
+  }
+  date: string | Date;
+  data: TLE;
+};
+
+type SatelliteStoreConfig = {
+  cacheLocal: boolean;
+  cacheTTL: number;
+  baseUrl: string;
+}
+
+const config: SatelliteStoreConfig = {
+  cacheLocal: true,
+  cacheTTL: 24 * 60 * 60,
   baseUrl: import.meta.env.BASE_URL
 };
 
 class SatelliteStore {
-  tleUrl = `${config.baseUrl}/data/attributed-TLE.json`;
+  tleUrl = `${config.baseUrl}/data/-TLE.json`;
   eventManager: EventManager;
   satData: SatelliteObject[] = [];
   attribution?: {
@@ -30,22 +50,43 @@ class SatelliteStore {
     }
   }
 
+  loadFromCache () {
+    localStorage.getItem('satellite.data');
+  }
+
   async loadSatelliteData () {
     try {
-      const response = await axios.get(this.tleUrl, {
+
+      const tleUrl = new URL(this.tleUrl, window.location.href);
+      let attributedData: attributedTLE | undefined;
+      let response = await axios.get(tleUrl.toString(), {
         params: {
           t: Date.now()
         }
       });
 
       if (response.data) {
-        if (Array.isArray(response.data)) {
-          this.satData = response.data;
-        } else {
-          this.satData = response.data.data;
-          this.attribution = response.data.source;
-          this.updateDate = response.data.date;
+        attributedData = response.data;
+      }
+
+      // support data being in separate location
+      if (typeof attributedData?.data === 'string') {
+        const url = new URL(attributedData.data, tleUrl);
+        response = await axios.get(url.toString(), {
+          params: {
+            t: Date.now()
+          }
+        });
+
+        if (response.data) {
+          attributedData.data = response.data;
         }
+      }
+
+      if (attributedData) {
+        this.satData = attributedData.data as SatelliteObject[];
+        this.attribution = attributedData.source;
+        this.updateDate = ensureJsDate(attributedData.date);
 
         for (let i = 0; i < this.satData.length; i++) {
           if (this.satData[i].INTLDES) {

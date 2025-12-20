@@ -5,8 +5,10 @@ class ShaderStore {
   basePath = 'shaders/';
   baseUrl = `./${this.basePath}`;
   shaders = [
-    'earth-fragment',
-    'earth-vertex',
+    'earth-ground-fragment',
+    'earth-ground-vertex',
+    'earth-sky-fragment',
+    'earth-sky-vertex',
     'dot-fragment',
     'dot-vertex',
     'dot2-fragment',

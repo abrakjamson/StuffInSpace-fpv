@@ -1,3 +1,4 @@
+import { Camera } from 'three';
 import type SatelliteGroups from '../SatelliteGroups';
 import type SatelliteStore from '../SatelliteStore';
 import type ShaderStore from '../ShaderStore';
@@ -8,4 +9,5 @@ export interface ViewerContext {
   config: Record<string, any>;
   satelliteStore: SatelliteStore;
   shaderStore: ShaderStore;
+  camera?: Camera
 }

@@ -314,7 +314,6 @@ function init (viewerInstance: Viewer, appConfig: Record<string, any> = {}) {
     onSatDataLoaded();
   }
 
-  console.log('xoooo', appConfig);
   setHtml('.app-version', appConfig.appInfo.version);
   setHtml('.build-date', appConfig.appInfo.buildDate);
   setHtml('.release-date', appConfig.appInfo.buildDate);

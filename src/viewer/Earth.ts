@@ -1,151 +1,438 @@
-import { ShaderMaterial, UniformsUtils, Texture } from 'three';
-import { Color, TextureLoader, MeshPhongMaterial, SphereGeometry, Mesh, Group, BackSide, AdditiveBlending } from '../utils/three';
+import { ShaderMaterial, Texture, IUniform } from 'three';
+import * as THREE from 'three';
+import { Mesh, Group } from 'three';
 import SceneComponent from './interfaces/SceneComponent';
 import SatelliteOrbitScene from './SatelliteOrbitScene';
 import { ViewerContext } from './interfaces/ViewerContext';
+import ShaderStore from './ShaderStore';
 
-class Earth implements SceneComponent {
-  baseUrl = '';
-  basePath = '/StuffInSpace/images';
-  radiusInKm = 6371.0;
-  pxToRadius = 3185.5;
-  addAtmosphere = false;
-  addClouds = true;
 
-  sphere: Mesh | undefined = undefined;
-  group: Group | undefined = undefined;
+/**
+ * Code principally taken from: https://jsfiddle.net/mars91/qd659xpw/8/
+ * with adjustments for the current project and Typescript
+ *
+ * Developped by Chris Bolig and Sean O'Neil
+ */
 
-  private async loadTexture (textureUrl: string): Promise<Texture> {
-    const loader = new TextureLoader();
-    return new Promise ((resolve, reject) => {
-      loader.load(
-        textureUrl,
-        texture => resolve(texture),
-        undefined,
-        error => reject(error)
-      );
-    });
-  }
+interface IUniformExt extends IUniform {
+  type: string;
+  value: unknown
+}
 
-  async initClouds (scene: SatelliteOrbitScene, group: Group) {
-    // this isn't a great implementation of the clouds,
-    // so will leave off by default
-    const texture = await this.loadTexture(`${this.basePath}/Earth_Cloud.jpg`);
+const EARHRADIUS = 2;
+const atmosphere = {
+  Kr: 0.0025,
+  Km: 0.0010,
+  ESun: 20.0, //recnet change 20-->17
+  g: -0.950,
+  innerRadius: EARHRADIUS,
+  outerRadius: 1.025 * EARHRADIUS,
+  wavelength: [0.650, 0.570, 0.475],
+  scaleDepth: 0.25,
+  mieScaleDepth: 0.1
+};
 
-    const radius = scene.km2pixels(this.radiusInKm + 0.02);
-    const geometry = new SphereGeometry(radius, 32, 32);
+const AtmUniforms: Record<string, IUniformExt> = {
+  v3LightPosition: { type: 'v3', value: new THREE.Vector3(1, 0, 0).normalize() },
+  cPs: { type: 'v3', value: new THREE.Vector3(1, 0, 0) },
+  v3InvWavelength: { type: 'v3', value: new THREE.Vector3(1 / Math.pow(atmosphere.wavelength[0], 4), 1 / Math.pow(atmosphere.wavelength[1], 4), 1 / Math.pow(atmosphere.wavelength[2], 4)) },
+  fCameraHeight: { type: 'f', value: 0 },
+  fCameraHeight2: { type: 'f', value: 0 },
+  fInnerRadius: { type: 'f', value: atmosphere.innerRadius },
+  fInnerRadius2: { type: 'f', value: atmosphere.innerRadius * atmosphere.innerRadius },
+  fOuterRadius: { type: 'f', value: atmosphere.outerRadius },
+  fOuterRadius2: { type: 'f', value: atmosphere.outerRadius * atmosphere.outerRadius },
+  fKrESun: { type: 'f', value: atmosphere.Kr * atmosphere.ESun },
+  fKmESun: { type: 'f', value: atmosphere.Km * atmosphere.ESun },
+  fKr4PI: { type: 'f', value: atmosphere.Kr * 4.0 * Math.PI },
+  fKm4PI: { type: 'f', value: atmosphere.Km * 4.0 * Math.PI },
+  fScale: { type: 'f', value: 1 / (atmosphere.outerRadius - atmosphere.innerRadius) },
+  fScaleDepth: { type: 'f', value: atmosphere.scaleDepth },
+  fScaleOverScaleDepth: { type: 'f', value: 1 / (atmosphere.outerRadius - atmosphere.innerRadius) / atmosphere.scaleDepth },
+  g: { type: 'f', value: atmosphere.g },
+  g2: { type: 'f', value: atmosphere.g * atmosphere.g },
+  nSamples: { type: 'i', value: 3 },
+  fSamples: { type: 'f', value: 3.0 },
+  tDisplacement: { type: 't', value: 0 },
+  tSkyboxDiffuse: { type: 't', value: 0 },
+  fNightScale: { type: 'f', value: 1 },
+  tDiffuse: { type: 't', value: null },
+  tDiffuseNight: { type: 't', value: null}
+};
 
-    const material = new MeshPhongMaterial({
-      map: texture,
-      opacity: 0.3,
-      transparent: true
-    });
 
-    const mesh = new Mesh(geometry, material);
-    const scale = 1.01;
-    mesh.scale.set(scale, scale, scale);
+// const vertexSky = `
+// // Referenced Atmospheric scattering vertex shader
+// //
+// // From author: Sean O'Neil
+// //
+// // Copyright (c) 2004 Sean O'Neil
+// //
+// //
+// // Edited by Chris Bolig for threejs
 
-    group.add(mesh);
-  }
+// uniform vec3 v3LightPosition;    // The direction vector to the light source
+// uniform vec3 v3InvWavelength;  // 1 / pow(wavelength, 4) for the red, green, and blue channels
+// uniform vec3 cPs;  // camera that will rotate
+// uniform float fCameraHeight;   // The camera's current height
+// uniform float fCameraHeight2;   // fCameraHeight^2
+// uniform float fOuterRadius;     // The outer (atmosphere) radius
+// uniform float fOuterRadius2;  // fOuterRadius^2
+// uniform float fInnerRadius;      // The inner (planetary) radius
+// uniform float fInnerRadius2;   // fInnerRadius^2
+// uniform float fKrESun;           // Kr * ESun
+// uniform float fKmESun;            // Km * ESun
+// uniform float fKr4PI;         // Kr * 4 * PI
+// uniform float fKm4PI;           // Km * 4 * PI
+// uniform float fScale;           // 1 / (fOuterRadius - fInnerRadius)
+// uniform float fScaleDepth;        // The scale depth (i.e. the altitude at which the atmosphere's average density is found)
+// uniform float fScaleOverScaleDepth;  // fScale / fScaleDepth
+// const int nSamples = 3;
+// const float fSamples = 3.0;
+// varying vec3 v3Direction;
+// varying vec3 c0;
+// varying vec3 c1;
+// float scale(float fCos)
+// {
+//     float x = 1.0 - fCos;
+//     return fScaleDepth * exp(-0.00287 + x*(0.459 + x*(3.83 + x*(-6.80 + x*5.25))));
+// }
+// void main(void)
+// {
+//     float fCameraHeight = length(cPs);
+//     float fCameraHeight2 = fCameraHeight*fCameraHeight;
+//     // Get the ray from the camera to the vertex and its length (which is the far point of the ray passing through the atmosphere)
+//     vec3 v3Ray = position - cPs;
+//     float fFar = length(v3Ray);
+//     v3Ray /= fFar;
 
-  initAtmosphere (scene: SatelliteOrbitScene, group: Group) {
-    // this isn't a great implementation of the atmospheric effect,
-    // so will leave off by default
-    const vertexShader = [
-      'varying vec3 vNormal;',
-      'varying vec3 vPosition;',
-      'void main() {',
-      'vNormal = normalize( normalMatrix * normal );',
-      'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
-      'vPosition = gl_Position.xyz;',
-      '}'
-    ].join('\n');
+//     // Calculate the closest intersection of the ray with the outer atmosphere (which is the near point of the ray passing through the atmosphere)
+//     float B = 2.0 * dot(cPs, v3Ray);
+//     float C = fCameraHeight2 - fOuterRadius2;
+//     float fDet = max(0.0, B*B - 4.0 * C);
+//     float fNear = 0.5 * (-B - sqrt(fDet));
 
-    const fragmentShader = [
-      'varying vec3 vNormal;',
-      'varying vec3 vPosition;',
-      'void main() {',
-      '  float intensity = pow( 0.8 + dot( vNormal, vec3( 0, 0, 1.0 ) ), 12.0 );',
-      '  intensity = min(intensity, 1.7);',
-      '  gl_FragColor = vec4( 0.37, 0.71, 0.93, 0.6 ) * intensity;',
-      '}'
-    ].join('\n');
+//     // Calculate the ray's starting position, then calculate its scattering offset
+//     vec3 v3Start = cPs + v3Ray * fNear;
+//     fFar -= fNear;
+//     float fStartAngle = dot(v3Ray, v3Start) / fOuterRadius;
+//     float fStartDepth = exp(-1.0 / fScaleDepth);
+//     float fStartOffset = fStartDepth * scale(fStartAngle);
 
-    const uniforms = UniformsUtils.clone({});
+//     // Initialize the scattering loop variables
+//     float fSampleLength = fFar / fSamples;
+//     float fScaledLength = fSampleLength * fScale;
+//     vec3 v3SampleRay = v3Ray * fSampleLength;
+//     vec3 v3SamplePoint = v3Start + v3SampleRay * 0.5;
 
-    const material = new ShaderMaterial({
-      uniforms: uniforms,
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      side: BackSide,
-      blending: AdditiveBlending,
-      transparent: true,
-    });
+//     // Now loop through the sample rays
+//     vec3 v3FrontColor = vec3(0.0, 0.0, 0.0);
+//     for(int i=0; i<nSamples; i++)
+//     {
+//         float fHeight = length(v3SamplePoint);
+//         float fDepth = exp(fScaleOverScaleDepth * (fInnerRadius - fHeight));
+//         float fLightAngle = dot(v3LightPosition, v3SamplePoint) / fHeight;
+//         float fCameraAngle = dot(v3Ray, v3SamplePoint) / fHeight;
+//         float fScatter = (fStartOffset + fDepth * (scale(fLightAngle) - scale(fCameraAngle)));
+//         vec3 v3Attenuate = exp(-fScatter * (v3InvWavelength * fKr4PI + fKm4PI));
+//         v3FrontColor += v3Attenuate * (fDepth * fScaledLength);
+//         v3SamplePoint += v3SampleRay;
+//     }
+//     // Finally, scale the Mie and Rayleigh colors and set up the varying variables for the pixel shader
+//     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+//     c0 = v3FrontColor * (v3InvWavelength * fKrESun);
+//     c1 = v3FrontColor * fKmESun;
+//     v3Direction = cPs - position;
+// }
+// `;
 
-    const radius = scene.km2pixels(this.radiusInKm + 0.1);
-    const geometry = new SphereGeometry(radius, 32, 32);
+// const fragmentSky = `
+// uniform vec3 v3LightPos;
+// uniform float g;
+// uniform float g2;
+// varying vec3 v3Direction;
+// varying vec3 c0;
+// varying vec3 c1;
 
-    const mesh = new Mesh(geometry, material);
-    const scale = 1.019;
-    mesh.scale.set(scale, scale, scale);
+// // Calculates the Mie phase function
+// float getMiePhase(float fCos, float fCos2, float g, float g2)
+// {
+//     return 1.5 * ((1.0 - g2) / (2.0 + g2)) * (1.0 + fCos2) / pow(1.0 + g2 - 2.0 * g * fCos, 1.5);
+// }
 
-    group.add(mesh);
-  }
+// // Calculates the Rayleigh phase function
+// float getRayleighPhase(float fCos2)
+// {
+//     return 0.75 + 0.75 * fCos2;
+// }
 
-  async init (scene: SatelliteOrbitScene, context: ViewerContext) {
-    if (context.config) {
-      this.baseUrl = context.config.baseUrl;
-      this.baseUrl = this.baseUrl.endsWith('/') ? this.baseUrl : `${this.baseUrl}/`;
+// void main (void)
+// {
+//   float fCos = dot(v3LightPos, v3Direction) / length(v3Direction);
+//   float fCos2 = fCos * fCos;
+//   vec3 color =    getRayleighPhase(fCos2) * c0 +
+//   getMiePhase(fCos, fCos2, g, g2) * c1;
+//   gl_FragColor = vec4(color, 1.0);
+//   gl_FragColor.a = gl_FragColor.b;
+// }
+// `;
+
+// const vertexGround = `
+// uniform vec3 v3LightPosition;       // The direction vector to the light source
+// uniform vec3 cPs;       // camera that will rotate
+// uniform vec3 v3InvWavelength;  // 1 / pow(wavelength, 4) for the red, green, and blue channels
+// uniform float fCameraHeight;   // The camera's current height
+// uniform float fCameraHeight2;   // fCameraHeight^2
+// uniform float fOuterRadius;     // The outer (atmosphere) radius
+// uniform float fOuterRadius2;  // fOuterRadius^2
+// uniform float fInnerRadius;      // The inner (planetary) radius
+// uniform float fInnerRadius2;   // fInnerRadius^2
+// uniform float fKrESun;           // Kr * ESun
+// uniform float fKmESun;            // Km * ESun
+// uniform float fKr4PI;         // Kr * 4 * PI
+// uniform float fKm4PI;           // Km * 4 * PI
+// uniform float fScale;           // 1 / (fOuterRadius - fInnerRadius)
+// uniform float fScaleDepth;        // The scale depth (i.e. the altitude at which the atmosphere's average density is found)
+// uniform float fScaleOverScaleDepth;  // fScale / fScaleDepth
+// uniform sampler2D tDiffuse;
+// varying vec3 v3Direction;
+// varying vec3 c0;
+// varying vec3 c1;
+// varying vec3 vNormal;
+// varying vec2 vUv;
+// const int nSamples = 3;
+// const float fSamples = 3.0;
+
+// float scale(float fCos)
+// {
+//     float x = 1.0 - fCos;
+//     return fScaleDepth * exp(-0.00287 + x*(0.459 + x*(3.83 + x*(-6.80 + x*5.25))));
+// }
+
+// void main(void)
+// {
+//     float fCameraHeight = length(cPs);
+//     float fCameraHeight2 = fCameraHeight*fCameraHeight;
+//     // Get the ray from the camera to the vertex and its length (which is the far point of the ray passing through the atmosphere)
+//     vec3 v3Ray = position - cPs;
+//     float fFar = length(v3Ray);
+//     v3Ray /= fFar;
+//     // Calculate the closest intersection of the ray with the outer atmosphere (which is the near point of the ray passing through the atmosphere)
+//     float B = 2.0 * dot(cPs, v3Ray);
+//     float C = fCameraHeight2 - fOuterRadius2;
+//     float fDet = max(0.0, B*B - 4.0 * C);
+//     float fNear = 0.5 * (-B - sqrt(fDet));
+//     // Calculate the ray's starting position, then calculate its scattering offset
+//     vec3 v3Start = cPs + v3Ray * fNear;
+//     fFar -= fNear;
+//     float fDepth = exp((fInnerRadius - fOuterRadius) / fScaleDepth);
+//     float fCameraAngle = dot(-v3Ray, position) / length(position);
+//     float fLightAngle = dot(v3LightPosition, position) / length(position);
+//     float fCameraScale = scale(fCameraAngle);
+//     float fLightScale = scale(fLightAngle);
+//     float fCameraOffset = fDepth*fCameraScale;
+//     float fTemp = (fLightScale + fCameraScale);
+//     // Initialize the scattering loop variables
+//     float fSampleLength = fFar / fSamples;
+//     float fScaledLength = fSampleLength * fScale;
+//     vec3 v3SampleRay = v3Ray * fSampleLength;
+//     vec3 v3SamplePoint = v3Start + v3SampleRay * 0.5;
+//     // Now loop through the sample rays
+//     vec3 v3FrontColor = vec3(0.0, 0.0, 0.0);
+//     vec3 v3Attenuate;
+//     for(int i=0; i<nSamples; i++)
+//   {
+//     float fHeight = length(v3SamplePoint);
+//     float fDepth = exp(fScaleOverScaleDepth * (fInnerRadius - fHeight));
+//     float fScatter = fDepth*fTemp - fCameraOffset;
+//     v3Attenuate = exp(-fScatter * (v3InvWavelength * fKr4PI + fKm4PI));
+//     v3FrontColor += v3Attenuate * (fDepth * fScaledLength);
+//     v3SamplePoint += v3SampleRay;
+//   }
+//     // Calculate the attenuation factor for the ground
+//     c0 = v3Attenuate;
+//     c1 = v3FrontColor * (v3InvWavelength * fKrESun + fKmESun);
+//     vUv = uv;
+//     vNormal = normal;
+//     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+// }
+// `;
+
+// const fragmentGround = `
+// uniform float fNightScale;
+// uniform vec3 v3LightPosition;
+// uniform sampler2D tDiffuse;
+// uniform sampler2D tDiffuseNight;
+// varying vec3 c0;
+// varying vec3 c1;
+// varying vec3 vNormal;
+// varying vec2 vUv;
+// void main (void)
+// {
+//     vec3 diffuseTex = texture2D( tDiffuse, vUv ).xyz;
+//     vec3 diffuseNightTex = texture2D( tDiffuseNight, vUv ).xyz;
+//     vec3 day = .75*diffuseTex * c0; //recent change 1-->.8
+//     vec3 night = fNightScale * diffuseNightTex  * (1.0 - c0);
+//     gl_FragColor = vec4(c1, 1.0) + vec4(day + night, 1.0);
+// }
+// `;
+
+////// ---- Earth ---- ////////
+class Earth extends Group implements SceneComponent {
+  static NAME = 'Earth3d';
+  earthDayTexture = 'images/8081_earthmap2k.jpg';
+  earthNightTexture = 'images/8081_earthlights4k.jpg';
+  baseUrl = '/StuffInSpace/';
+  camera?: THREE.Camera;
+  ground: Mesh;
+  sky: Mesh;
+  _sunvect: THREE.Vector3;
+  sunvect: THREE.Vector3;
+  cameracPs?: THREE.Vector3;
+  parentObj: Group;
+  quaternionRotateBack: THREE.Quaternion;
+  axisY: THREE.Vector3;
+
+  constructor (shaderStore: ShaderStore, camera?: THREE.Camera) {
+    super();
+
+    this.name = Earth.NAME;
+
+    const groundShader = shaderStore.getShader('earth-ground');
+    this.ground = new THREE.Mesh(
+      new THREE.SphereGeometry(atmosphere.innerRadius, 500, 500),
+      new THREE.ShaderMaterial({
+        uniforms: AtmUniforms,
+        vertexShader: groundShader.vertex,
+        fragmentShader: groundShader.fragment
+      }));
+    this.add(this.ground);
+
+    const skyShader = shaderStore.getShader('earth-sky');
+    this.sky = new THREE.Mesh(
+      new THREE.SphereGeometry(atmosphere.outerRadius, 500, 500),
+      new THREE.ShaderMaterial({
+        uniforms: AtmUniforms,
+        vertexShader: skyShader.vertex,
+        fragmentShader: skyShader.fragment,
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+      }));
+    this.add(this.sky);
+
+    // this.sky.material.renderOrder = 1;
+    // this.sky.material.depthWrite: false;
+    this._sunvect = new THREE.Vector3(1, 0, 0);
+    this.sunvect = new THREE.Vector3(1, 0, 0);
+    if (this.ground.material instanceof ShaderMaterial) {
+      this.ground.material.uniforms.v3LightPosition.value = this._sunvect;
     }
 
-    this.group = new Group();
+    // use this if earth is not at world 0,0,0
+    this.parentObj = new THREE.Group();  // replace with group
 
-    this.basePath = `${this.baseUrl}images`;
-    const dayTexture = await this.loadTexture(`${this.basePath}/earth-blue-marble.jpg`);
-    const nightTexture = await this.loadTexture(`${this.basePath}/nightearth-4096.png`);
-    const bumpTexture = await this.loadTexture(`${this.basePath}/8081_earthbump4k.jpg`);
-    const earthSpecularMap = await this.loadTexture(`${this.basePath}/earth-water.png`);
+    this.axisY = new THREE.Vector3(0, 1, 0);
+    this.quaternionRotateBack = new THREE.Quaternion(1, 1, 1, 1);
 
-    const dayMaterial = new MeshPhongMaterial({
-      map: dayTexture,
-      bumpMap: bumpTexture,
-      emissiveMap: nightTexture,
-      emissive: new Color(0x888888),
-      emissiveIntensity: 5,
-      specularMap: earthSpecularMap,
-      specular: 1,
-      shininess: 15,
-      bumpScale: 1
-    });
-
-    const radius = scene.km2pixels(this.radiusInKm);
-    const geometry = new SphereGeometry(radius, 32, 32);
-    this.sphere = new Mesh( geometry, dayMaterial );
-    this.group.add(this.sphere);
-
-    if (this.addClouds) {
-      this.initClouds(scene, this.group).catch(error => {
-        console.error('Error loading clouds', error);
-      });
+    if (camera) {
+      this.initCamera(camera);
     }
-
-    if (this.addAtmosphere) {
-      this.initAtmosphere(scene, this.group);
-    }
-
-    scene.add(this.group);
-
-    this.sphere.geometry.computeBoundingBox();
-    this.sphere.geometry.computeBoundingSphere();
   }
 
-  update (): void {
-    // do nothing
+  initCamera (camera: THREE.Camera) {
+    this.camera = camera;          // this is a shallow copy that will follow the controls
+
+    if (this.camera) {
+      this.cameracPs = new THREE.Vector3();
+      this.cameracPs.copy(this.camera.position);
+      this.cameracPs.sub(this.parentObj.position);
+      if (this.ground.material instanceof ShaderMaterial) {
+        this.ground.material.uniforms.cPs.value = this.cameracPs;
+      }
+    }
   }
 
-  getMesh () {
-    return this.sphere;
+  // use this if the earth rotates around y
+  update () {
+    if (this.camera && this.cameracPs) {
+      this.cameracPs.copy(this.camera.position);
+      this.cameracPs.sub(this.parentObj.position);
+    }
+    this._sunvect.copy(this.sunvect);
+
+    if (this.cameracPs) {
+      this.cameracPs.applyAxisAngle(this.axisY, -this.rotation.y);
+    }
+    this._sunvect.applyAxisAngle(this.axisY, -this.rotation.y);
+    if (this.ground.material instanceof ShaderMaterial) {
+      if (this.cameracPs) {
+        this.ground.material.uniforms.cPs.value = this.cameracPs;
+      }
+      this.ground.material.uniforms.v3LightPosition.value = this._sunvect;
+    }
+  }
+
+  // use this if the earth will not rotate
+  updateECI () {
+    if (this.camera && this.cameracPs) {
+      this.cameracPs.copy(this.camera.position);
+      this.cameracPs.sub(this.parentObj.position);
+      if (this.ground.material instanceof ShaderMaterial) {
+        this.ground.material.uniforms.cPs.value = this.cameracPs;
+      }
+    }
+  }
+
+  // use this if the earth anywhere
+  updateAllRotations () {
+    if (this.camera && this.cameracPs) {
+      this.cameracPs.copy(this.camera.position);
+      this.cameracPs.sub(this.parentObj.position);
+    }
+    this._sunvect.copy(this.sunvect);
+    this.quaternionRotateBack.copy(this.quaternion);
+    this.quaternionRotateBack.invert();
+    if (this.cameracPs) {
+      this.cameracPs.applyQuaternion(this.quaternionRotateBack);
+    }
+    this._sunvect.applyQuaternion(this.quaternionRotateBack);
+    if (this.ground.material instanceof ShaderMaterial) {
+      if (this.cameracPs) {
+        this.ground.material.uniforms.cPs.value = this.cameracPs;
+      }
+      this.ground.material.uniforms.v3LightPosition.value = this._sunvect;
+    }
+  }
+
+  setSun (sun: THREE.Vector3) {
+    this.sunvect.copy(sun);
+  }
+
+  loadTextures (texDay: Texture, texNight: Texture, maxAnisotropy = 16) {
+    texDay.anisotropy = maxAnisotropy;
+    texNight.anisotropy = maxAnisotropy;
+    AtmUniforms.tDiffuse.value = texDay;
+    AtmUniforms.tDiffuseNight.value = texNight;
+  }
+
+  init (scene: SatelliteOrbitScene, context: ViewerContext): void | Promise<void> {
+    // throw new Error('Method not implemented.');
+
+    if (context.camera) {
+      this.initCamera(context.camera);
+    }
+
+    const texldr = new THREE.TextureLoader();
+    const diffuse = texldr.load(`${this.baseUrl}${this.earthDayTexture}`);
+    const diffuseNight = texldr.load(`${this.baseUrl}${this.earthNightTexture}`);
+    this.loadTextures(diffuse,diffuseNight);
+
+    this.setSun(new THREE.Vector3(1,0,0));
+
+    scene.add(this);
   }
 }
+
 
 export default Earth;

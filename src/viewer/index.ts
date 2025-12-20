@@ -1,4 +1,4 @@
-import { Camera, Mesh, PerspectiveCamera, WebGLRenderer } from '../utils/three';
+import { Camera, PerspectiveCamera, WebGLRenderer, Box3, Object3D } from 'three';
 
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Earth from './Earth';
@@ -66,16 +66,11 @@ class Viewer {
     await sceneComponent.init(this.scene as SatelliteOrbitScene, this.context);
   }
 
-  private getCenterPoint (mesh: Mesh): Vector3 | undefined {
-    if (mesh) {
-      const geometry = mesh.geometry;
-      geometry.computeBoundingBox();
+  private getCenterPoint (object3d: Object3D): Vector3 | undefined {
+    if (object3d) {
+      const box = (new Box3()).setFromObject(object3d, true);
       const center = new Vector3();
-      if (geometry.boundingBox) {
-        geometry.boundingBox.getCenter( center );
-        mesh.localToWorld( center );
-        return center;
-      }
+      return box.getCenter(center);
     }
     return undefined;
   }
@@ -252,6 +247,7 @@ class Viewer {
       this.camera = new PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
       this.camera.position.z = 15;
       this.camera.zoom = 1;
+      this.context.camera = this.camera;
 
       this.renderer = new WebGLRenderer({ antialias: true });
       this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -296,7 +292,8 @@ class Viewer {
 
       this.satelliteStore.addEventListener('satdataloaded', this.onSatDataLoaded.bind(this));
 
-      this.earth = new Earth();
+      this.earth = new Earth(this.context.shaderStore);
+
       await this.registerSceneComponent('earth', this.earth);
       await this.registerSceneComponent('sun', new Sun());
       await this.registerSceneComponent('universe', new Universe());
@@ -305,7 +302,7 @@ class Viewer {
       this.orbits = new Orbits();
       await this.registerSceneComponent('orbits', this.orbits);
 
-      const centrePoint = this.getCenterPoint(this.earth.getMesh() as Mesh);
+      const centrePoint = this.getCenterPoint(this.earth);
       if (centrePoint) {
         this.controls.target = centrePoint;
       }

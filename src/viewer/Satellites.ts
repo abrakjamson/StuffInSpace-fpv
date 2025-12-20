@@ -10,7 +10,7 @@ import {
   OneMinusSrcAlphaFactor,
   SrcAlphaFactor,
   CustomBlending,
-} from '../utils/three';
+} from 'three';
 import SceneComponent from './interfaces/SceneComponent';
 import SatelliteStore from './SatelliteStore';
 import SatCruncherWorker from './workers/SatCruncherWorker?worker';
