@@ -46,7 +46,7 @@ class Satellites implements SceneComponent, SelectableSatellite {
   hoverSatelliteIdx = -1;
   fpvRenderOptions: FpvRenderOptions = {
     enabled: false,
-    rangeKm: 100
+    rangeKm: 'all'
   };
 
   setColorScheme (colorScheme: ColorScheme) {
@@ -148,14 +148,15 @@ class Satellites implements SceneComponent, SelectableSatellite {
     const dz = satelliteZ - this.fpvRenderOptions.observerPosition.z;
     const distanceKm = Math.sqrt(dx * dx + dy * dy + dz * dz) * this.scene.getPixels2Radius();
 
-    if (distanceKm > this.fpvRenderOptions.rangeKm) {
+    if (this.fpvRenderOptions.rangeKm !== 'all' && distanceKm > this.fpvRenderOptions.rangeKm) {
       return [0, 0, 0, 0];
     }
 
-    const rangeKm = Math.max(this.fpvRenderOptions.rangeKm, 0.1);
-    const normalizedDistance = Math.min(1, distanceKm / rangeKm);
-    const brightness = Math.max(0.22, 1 - Math.sqrt(normalizedDistance) * 0.78);
-    const alpha = Math.max(0.08, 1 - normalizedDistance * 0.92);
+    const normalizedDistance = this.fpvRenderOptions.rangeKm === 'all'
+      ? Math.min(1, Math.log10(distanceKm + 1) / Math.log10(50000))
+      : Math.min(1, distanceKm / Math.max(this.fpvRenderOptions.rangeKm, 0.1));
+    const brightness = Math.max(0.3, 1 - Math.sqrt(normalizedDistance) * 0.7);
+    const alpha = Math.max(this.fpvRenderOptions.rangeKm === 'all' ? 0.14 : 0.08, 1 - normalizedDistance * 0.86);
 
     return [brightness, brightness, brightness, alpha];
   }

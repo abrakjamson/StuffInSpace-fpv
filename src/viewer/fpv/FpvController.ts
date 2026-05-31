@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SatelliteOrbitScene } from '../SatelliteOrbitScene';
 import { SatelliteStore } from '../SatelliteStore';
@@ -32,13 +32,16 @@ interface FpvControllerContext {
     scene: SatelliteOrbitScene;
     satelliteStore: SatelliteStore;
     satellites: Satellites;
+    canvas: HTMLCanvasElement;
     onTimeScaleChange: (timeScale: FpvTimeScale) => void;
     onStateChange: (state: FpvStateSnapshot) => void;
 }
 
 const ALLOWED_TIME_SCALES: FpvTimeScale[] = [1, 10, 100, 1000];
-const ALLOWED_RANGES: FpvRangeKm[] = [0.1, 1, 10, 100];
+const ALLOWED_RANGES: FpvRangeKm[] = ['all', 0.1, 10];
 const METRICS_INTERVAL_MS = 250;
+const LOOK_SENSITIVITY_RAD_PER_PIXEL = 0.003;
+const MAX_PITCH_RAD = Math.PI * 0.45;
 
 export class FpvController {
   private settings: FpvSettings = { ...DEFAULT_FPV_SETTINGS };
@@ -52,10 +55,17 @@ export class FpvController {
   private originalControlsAutoRotate?: boolean;
   private issSatelliteIndex?: number;
   private renderEnabled = false;
+  private lookYawRad = 0;
+  private lookPitchRad = 0;
+  private isDraggingLook = false;
+  private lastPointerX = 0;
+  private lastPointerY = 0;
 
   init (context: FpvControllerContext): void {
     this.context = context;
     context.onTimeScaleChange(this.settings.timeScale);
+    this.registerLookControls(context.canvas);
+    this.applyCameraMode();
     this.notifyStateChange();
   }
 
@@ -156,8 +166,8 @@ export class FpvController {
     this.notifyStateChange();
   }
 
-  setRangeKm (rangeKm: number): void {
-    const nextRangeKm = ALLOWED_RANGES.includes(rangeKm as FpvRangeKm) ? rangeKm as FpvRangeKm : 100;
+  setRangeKm (rangeKm: string | number): void {
+    const nextRangeKm = parseRangeKm(rangeKm);
 
     if (this.settings.rangeKm === nextRangeKm) {
       return;
@@ -184,6 +194,10 @@ export class FpvController {
         }
         : null,
       metrics: { ...this.metrics },
+      look: {
+        yawDeg: radToDeg(this.lookYawRad),
+        pitchDeg: radToDeg(this.lookPitchRad),
+      },
     };
   }
 
@@ -263,11 +277,61 @@ export class FpvController {
       return;
     }
 
-    const target = new Vector3().copy(observer.scenePosition).add(observer.cameraForward);
+    const yawQuaternion = new Quaternion().setFromAxisAngle(observer.cameraUp, this.lookYawRad);
+    const yawedForward = observer.cameraForward.clone().applyQuaternion(yawQuaternion).normalize();
+    const yawedUp = observer.cameraUp.clone().applyQuaternion(yawQuaternion).normalize();
+    const right = yawedForward.clone().cross(yawedUp).normalize();
+    const pitchQuaternion = new Quaternion().setFromAxisAngle(right, this.lookPitchRad);
+    const cameraForward = yawedForward.applyQuaternion(pitchQuaternion).normalize();
+    const cameraUp = yawedUp.applyQuaternion(pitchQuaternion).normalize();
+    const target = new Vector3().copy(observer.scenePosition).add(cameraForward);
     this.context.camera.position.copy(observer.scenePosition);
-    this.context.camera.up.copy(observer.cameraUp);
+    this.context.camera.up.copy(cameraUp);
     this.context.camera.lookAt(target);
   }
+
+  private registerLookControls (canvas: HTMLCanvasElement): void {
+    canvas.addEventListener('pointerdown', this.onPointerDown);
+    canvas.addEventListener('pointermove', this.onPointerMove);
+    canvas.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('lostpointercapture', this.onPointerUp);
+  }
+
+  private onPointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    this.isDraggingLook = true;
+    this.lastPointerX = event.clientX;
+    this.lastPointerY = event.clientY;
+    (event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  private onPointerMove = (event: PointerEvent): void => {
+    if (!this.isDraggingLook) {
+      return;
+    }
+
+    const deltaX = event.clientX - this.lastPointerX;
+    const deltaY = event.clientY - this.lastPointerY;
+    this.lastPointerX = event.clientX;
+    this.lastPointerY = event.clientY;
+    this.lookYawRad -= deltaX * LOOK_SENSITIVITY_RAD_PER_PIXEL;
+    this.lookPitchRad = clamp(
+      this.lookPitchRad - deltaY * LOOK_SENSITIVITY_RAD_PER_PIXEL,
+      -MAX_PITCH_RAD,
+      MAX_PITCH_RAD
+    );
+    this.notifyStateChange();
+    event.preventDefault();
+  };
+
+  private onPointerUp = (): void => {
+    this.isDraggingLook = false;
+  };
 
   private setRenderOptions (options: FpvRenderOptions): void {
     this.context?.satellites.setFpvRenderOptions(options);
@@ -286,6 +350,23 @@ function clampFinite (value: number | undefined, fallback: number, min: number, 
   }
 
   return Math.min(max, Math.max(min, value));
+}
+
+function clamp (value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseRangeKm (rangeKm: string | number): FpvRangeKm {
+  if (rangeKm === 'all') {
+    return 'all';
+  }
+
+  const numericRangeKm = Number(rangeKm);
+  return ALLOWED_RANGES.includes(numericRangeKm as FpvRangeKm) ? numericRangeKm as FpvRangeKm : 'all';
+}
+
+function radToDeg (value: number): number {
+  return value * 180 / Math.PI;
 }
 
 function normalizeDegrees (value: number): number {

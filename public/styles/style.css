@@ -196,6 +196,10 @@ ul {
   margin: 8px 0;
 }
 
+.fpv-range-group {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .fpv-button-group button {
   cursor: pointer;
   padding: 6px 4px;

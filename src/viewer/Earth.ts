@@ -280,7 +280,7 @@ const AtmUniforms: Record<string, IUniformExt> = {
 ////// ---- Earth ---- ////////
 class Earth extends Group implements SceneComponent {
   static NAME = 'Earth3d';
-  earthDayTexture = 'images/8081_earthmap2k.jpg';
+  earthDayTexture = 'images/8081_earthmap4k.jpg';
   earthNightTexture = 'images/8081_earthlights4k.jpg';
   baseUrl = '/StuffInSpace/';
   camera?: THREE.Camera;

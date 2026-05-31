@@ -272,7 +272,7 @@ class Viewer {
       this.controls.zoomSpeed = 3;
       this.controls.maxZoom = 10;
       this.controls.minZoom = 3;
-      this.controls.autoRotate = true;
+      this.controls.autoRotate = false;
       this.controls.autoRotateSpeed = 0.5;
       this.controls.maxDistance = 50;
       this.controls.minDistance = 3;
@@ -305,8 +305,6 @@ class Viewer {
       await this.registerSceneComponent('universe', new Universe());
       this.satellites = new Satellites();
       await this.registerSceneComponent('satellites', this.satellites);
-      this.orbits = new Orbits();
-      await this.registerSceneComponent('orbits', this.orbits);
       this.fpvController = new FpvController();
       this.fpvController.init({
         camera: this.camera,
@@ -314,6 +312,7 @@ class Viewer {
         scene: this.scene,
         satelliteStore: this.satelliteStore,
         satellites: this.satellites,
+        canvas: this.renderer.domElement,
         onTimeScaleChange: (timeScale) => this.satellites?.setTimeScale(timeScale),
         onStateChange: (state) => this.eventManager.fireEvent('fpvStateChange', state)
       });
@@ -327,10 +326,6 @@ class Viewer {
 
       window.addEventListener('resize', this.onWindowResize.bind(this));
 
-      const canvasElement = this.renderer.domElement;
-      canvasElement.addEventListener('mousedown', this.onMouseDown.bind(this));
-      canvasElement.addEventListener('mouseup', this.onMouseUp.bind(this));
-      canvasElement.addEventListener('mousemove', this.onHover.bind(this));
     } catch (error) {
       logger.error('Error while initialising scene', error);
     }

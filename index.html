@@ -40,8 +40,6 @@
 
     <div id="menu-right" class="toolbar">
       <ul class="menu">
-        <li class="menu-item" data-action="open:search-window">Search</li>
-        <li class="menu-item" data-action="open:groups-window">Groups</li>
         <li class="menu-item" data-action="open:help-window">Help</li>
         <li class="menu-item" data-action="open:about-window">About</li>
       </ul>
@@ -49,10 +47,6 @@
 
     <div id="fpv-panel" data-testid="fpv-panel">
       <div class="fpv-panel-header">LEO first-person view</div>
-      <label class="fpv-toggle">
-        <input type="checkbox" id="fpv-enabled" data-testid="fpv-enabled" />
-        Enable FPV camera
-      </label>
 
       <label>
         Anchor
@@ -83,11 +77,9 @@
         <button type="button" class="fpv-speed" data-speed="100" data-testid="fpv-speed-100">100x</button>
         <button type="button" class="fpv-speed" data-speed="1000" data-testid="fpv-speed-1000">1000x</button>
       </div>
-
-      <div class="fpv-button-group" aria-label="distance filter">
-        <button type="button" class="fpv-range selected" data-range="100" data-testid="fpv-range-100">100 km</button>
+      <div class="fpv-button-group fpv-range-group" aria-label="distance filter">
+        <button type="button" class="fpv-range selected" data-range="all" data-testid="fpv-range-all">All</button>
         <button type="button" class="fpv-range" data-range="10" data-testid="fpv-range-10">10 km</button>
-        <button type="button" class="fpv-range" data-range="1" data-testid="fpv-range-1">1 km</button>
         <button type="button" class="fpv-range" data-range="0.1" data-testid="fpv-range-100m">100 m</button>
       </div>
 
@@ -206,14 +198,10 @@
       </ul>
       <ul id="controls-info">
         <li>
-          Left/Right click and drag to rotate camera
-        </li>
-        <li> Mousewheel to scroll </li>
-        <li>
-          Left click to select an object
+          Click and drag the sky to look around from the first-person LEO camera.
         </li>
         <li>
-          Enable LEO first-person view to ride a circular orbit or the ISS, then use time warp and range filters to compare how empty space looks with how rare close passes still matter.
+          Choose a custom circular orbit or ride along with the ISS, then use time warp and range filters to compare how empty space looks with how rare close passes still matter.
         </li>
       </ul>
     </div>
@@ -232,7 +220,7 @@
         build date: <span class="build-date">n/a</span>
       </p>
 
-      <p>Stuff in Space is a realtime 3D map of objects in Earth orbit, visualized using WebGL.</p>
+      <p>Stuff in Space FPV is a realtime first-person visualization of objects in Earth orbit, visualized using WebGL.</p>
 
       <p>The LEO first-person view is an educational visualization. Its nearest-object, relative-speed, and next-pass readouts are based on catalog TLE propagation and coarse visual estimates, not operational conjunction assessment.</p>
 

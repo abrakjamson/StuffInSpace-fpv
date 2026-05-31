@@ -261,13 +261,12 @@ function onSatMovementChange (event: any) {
 }
 
 function initFpvControls () {
-  const enabledInput = document.querySelector<HTMLInputElement>('#fpv-enabled');
   const modeSelect = document.querySelector<HTMLSelectElement>('#fpv-mode');
   const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
   const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
   const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
 
-  if (!enabledInput || !modeSelect || !altitudeInput || !inclinationInput || !raanInput) {
+  if (!modeSelect || !altitudeInput || !inclinationInput || !raanInput) {
     return;
   }
 
@@ -278,10 +277,6 @@ function initFpvControls () {
       Number(raanInput.value)
     );
   };
-
-  enabledInput.addEventListener('change', () => {
-    viewer.setFpvEnabled(enabledInput.checked);
-  });
 
   modeSelect.addEventListener('change', () => {
     viewer.setFpvObserverMode(modeSelect.value);
@@ -312,15 +307,10 @@ function initFpvControls () {
 }
 
 function onFpvStateChange (state: FpvStateSnapshot) {
-  const enabledInput = document.querySelector<HTMLInputElement>('#fpv-enabled');
   const modeSelect = document.querySelector<HTMLSelectElement>('#fpv-mode');
   const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
   const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
   const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
-
-  if (enabledInput) {
-    enabledInput.checked = state.settings.enabled;
-  }
 
   if (modeSelect) {
     modeSelect.value = state.settings.mode;

@@ -7,13 +7,13 @@ const EARTH_MU_KM3_PER_SEC2 = 398600.4418;
 const TWO_PI = Math.PI * 2;
 
 export const DEFAULT_FPV_SETTINGS: FpvSettings = {
-  enabled: false,
+  enabled: true,
   mode: 'custom',
   altitudeKm: 420,
   inclinationDeg: 51.6,
   raanDeg: 0,
   timeScale: 1,
-  rangeKm: 100,
+  rangeKm: 'all',
 };
 
 export function scenePositionFromKm (positionKm: Vector3, kilometersPerSceneUnit: number): Vector3 {

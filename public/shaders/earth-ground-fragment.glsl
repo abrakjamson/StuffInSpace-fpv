@@ -10,7 +10,9 @@ void main (void)
 {
     vec3 diffuseTex = texture2D( tDiffuse, vUv ).xyz;
     vec3 diffuseNightTex = texture2D( tDiffuseNight, vUv ).xyz;
-    vec3 day = .75*diffuseTex * c0; //recent change 1-->.8
-    vec3 night = fNightScale * diffuseNightTex  * (1.0 - c0);
-    gl_FragColor = vec4(c1, 1.0) + vec4(day + night, 1.0);
+    float sunlight = clamp(dot(normalize(vNormal), normalize(v3LightPosition)), -1.0, 1.0);
+    float terminator = smoothstep(-0.08, 0.18, sunlight);
+    vec3 day = diffuseTex * (0.18 + 0.92 * terminator);
+    vec3 night = fNightScale * diffuseNightTex * (1.0 - terminator);
+    gl_FragColor = vec4(c1 + day + night, 1.0);
 }
