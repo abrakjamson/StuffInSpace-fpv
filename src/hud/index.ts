@@ -2,6 +2,7 @@
 import { R2D, Events } from '@/constants';
 import SatelliteGroup from '@satellite-viewer/SatelliteGroup';
 import { Viewer } from '@satellite-viewer/index';
+import { FpvStateSnapshot } from '@satellite-viewer/fpv/types';
 import HudWindowManager from './HudWindowManager';
 import searchBox from './SearchBox';
 
@@ -259,6 +260,156 @@ function onSatMovementChange (event: any) {
   }
 }
 
+function initFpvControls () {
+  const enabledInput = document.querySelector<HTMLInputElement>('#fpv-enabled');
+  const modeSelect = document.querySelector<HTMLSelectElement>('#fpv-mode');
+  const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
+  const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
+  const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
+
+  if (!enabledInput || !modeSelect || !altitudeInput || !inclinationInput || !raanInput) {
+    return;
+  }
+
+  const applyCustomOrbit = () => {
+    viewer.setFpvCustomOrbit(
+      Number(altitudeInput.value),
+      Number(inclinationInput.value),
+      Number(raanInput.value)
+    );
+  };
+
+  enabledInput.addEventListener('change', () => {
+    viewer.setFpvEnabled(enabledInput.checked);
+  });
+
+  modeSelect.addEventListener('change', () => {
+    viewer.setFpvObserverMode(modeSelect.value);
+    updateCustomControlState(modeSelect.value);
+  });
+
+  altitudeInput.addEventListener('change', applyCustomOrbit);
+  inclinationInput.addEventListener('change', applyCustomOrbit);
+  raanInput.addEventListener('change', applyCustomOrbit);
+
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.fpv-speed')).forEach((button) => {
+    button.addEventListener('click', () => {
+      viewer.setFpvTimeScale(Number(button.dataset.speed));
+    });
+  });
+
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.fpv-range')).forEach((button) => {
+    button.addEventListener('click', () => {
+      viewer.setFpvRangeKm(Number(button.dataset.range));
+    });
+  });
+
+  viewer.addEventListener(Events.fpvStateChange, onFpvStateChange);
+  const initialState = viewer.getFpvState();
+  if (initialState) {
+    onFpvStateChange(initialState);
+  }
+}
+
+function onFpvStateChange (state: FpvStateSnapshot) {
+  const enabledInput = document.querySelector<HTMLInputElement>('#fpv-enabled');
+  const modeSelect = document.querySelector<HTMLSelectElement>('#fpv-mode');
+  const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
+  const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
+  const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
+
+  if (enabledInput) {
+    enabledInput.checked = state.settings.enabled;
+  }
+
+  if (modeSelect) {
+    modeSelect.value = state.settings.mode;
+    updateCustomControlState(state.settings.mode);
+  }
+
+  syncNumberInput(altitudeInput, state.settings.altitudeKm.toFixed(0));
+  syncNumberInput(inclinationInput, state.settings.inclinationDeg.toFixed(1));
+  syncNumberInput(raanInput, state.settings.raanDeg.toFixed(1));
+
+  document.body.classList.toggle('fpv-active', state.settings.enabled);
+  setSelectedButton('.fpv-speed', 'speed', String(state.settings.timeScale));
+  setSelectedButton('.fpv-range', 'range', String(state.settings.rangeKm));
+
+  setHtml('#fpv-observer', state.observer ? `${state.observer.label} (${state.observer.altitudeKm.toFixed(0)} km)` : 'Waiting for observer');
+  setHtml('#fpv-nearest', formatNearest(state));
+  setHtml('#fpv-count-1', state.metrics.countWithin1Km.toLocaleString());
+  setHtml('#fpv-count-10', state.metrics.countWithin10Km.toLocaleString());
+  setHtml('#fpv-count-100', state.metrics.countWithin100Km.toLocaleString());
+  setHtml('#fpv-relative-velocity', formatNumber(state.metrics.nearestRelativeVelocityKmSec, 'km/s'));
+  setHtml('#fpv-next-pass', formatNextPass(state));
+}
+
+function syncNumberInput (input: HTMLInputElement | null, value: string) {
+  if (input && document.activeElement !== input) {
+    input.value = value;
+  }
+}
+
+function updateCustomControlState (mode: string) {
+  const customControls = document.querySelector('#fpv-custom-controls');
+  customControls?.classList.toggle('disabled', mode === 'iss');
+}
+
+function setSelectedButton (selector: string, dataKey: string, value: string) {
+  Array.from(document.querySelectorAll<HTMLButtonElement>(selector)).forEach((button) => {
+    button.classList.toggle('selected', button.dataset[dataKey] === value);
+  });
+}
+
+function formatNearest (state: FpvStateSnapshot) {
+  if (state.metrics.nearestDistanceKm === null) {
+    return 'No catalog object in view';
+  }
+
+  return `${state.metrics.nearestObjectName}: ${formatDistance(state.metrics.nearestDistanceKm)}`;
+}
+
+function formatDistance (distanceKm: number) {
+  if (distanceKm < 1) {
+    return `${(distanceKm * 1000).toFixed(0)} m`;
+  }
+
+  if (distanceKm < 100) {
+    return `${distanceKm.toFixed(2)} km`;
+  }
+
+  return `${distanceKm.toFixed(0)} km`;
+}
+
+function formatNumber (value: number | null, suffix: string) {
+  if (value === null) {
+    return '--';
+  }
+
+  return `${value.toFixed(2)} ${suffix}`;
+}
+
+function formatNextPass (state: FpvStateSnapshot) {
+  if (state.metrics.nextPassSeconds === null) {
+    return 'No pass predicted';
+  }
+
+  return `${state.metrics.nextPassObjectName} in ${formatDuration(state.metrics.nextPassSeconds)}`;
+}
+
+function formatDuration (seconds: number) {
+  if (seconds < 60) {
+    return `${seconds.toFixed(0)} s`;
+  }
+
+  const minutes = seconds / 60;
+  if (minutes < 60) {
+    return `${minutes.toFixed(1)} min`;
+  }
+
+  return `${(minutes / 60).toFixed(1)} h`;
+}
+
 function onSatDataLoaded () {
   initEventListeners();
   updateGroupList();
@@ -306,6 +457,7 @@ function init (viewerInstance: Viewer, appConfig: Record<string, any> = {}) {
   searchBox.init(viewer, windowManager);
 
   initMenus();
+  initFpvControls();
 
   viewer.addEventListener(Events.satMovementChange, onSatMovementChange);
   if (!viewer.ready) {

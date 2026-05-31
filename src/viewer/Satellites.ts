@@ -23,6 +23,7 @@ import ShaderStore from './ShaderStore';
 import GroupColorScheme from './color-schemes/GroupColorScheme';
 import { SatelliteObject } from './interfaces/SatelliteObject';
 import { ViewerContext } from './interfaces/ViewerContext';
+import { FpvRenderOptions } from './fpv/types';
 
 class Satellites implements SceneComponent, SelectableSatellite {
   baseUrl = '';
@@ -43,6 +44,10 @@ class Satellites implements SceneComponent, SelectableSatellite {
   selectedSatelliteIndexes: number[] = [];
   satelliteGroup?: SatelliteGroup;
   hoverSatelliteIdx = -1;
+  fpvRenderOptions: FpvRenderOptions = {
+    enabled: false,
+    rangeKm: 100
+  };
 
   setColorScheme (colorScheme: ColorScheme) {
     this.currentColorScheme = colorScheme;
@@ -109,6 +114,11 @@ class Satellites implements SceneComponent, SelectableSatellite {
         if (!color) {
           color = [0, 0, 0];
         }
+
+        if (this.fpvRenderOptions.enabled) {
+          color = this.getFpvSatelliteColor(i);
+        }
+
         const idx = i * 4;
         this.satelliteColors[idx] = color[0];
         this.satelliteColors[idx + 1] = color[1];
@@ -117,6 +127,58 @@ class Satellites implements SceneComponent, SelectableSatellite {
       }
       this.geometry.setAttribute('color', new Float32BufferAttribute(this.satelliteColors, 4));
     }
+  }
+
+  private getFpvSatelliteColor (satIdx: number): number[] {
+    if (!this.scene || !this.fpvRenderOptions.observerPosition || this.isExcludedFpvSatellite(satIdx)) {
+      return [0, 0, 0, 0];
+    }
+
+    const offset = satIdx * 3;
+    const satelliteX = this.satPos[offset];
+    const satelliteY = this.satPos[offset + 1];
+    const satelliteZ = this.satPos[offset + 2];
+
+    if (!Number.isFinite(satelliteX)) {
+      return [0, 0, 0, 0];
+    }
+
+    const dx = satelliteX - this.fpvRenderOptions.observerPosition.x;
+    const dy = satelliteY - this.fpvRenderOptions.observerPosition.y;
+    const dz = satelliteZ - this.fpvRenderOptions.observerPosition.z;
+    const distanceKm = Math.sqrt(dx * dx + dy * dy + dz * dz) * this.scene.getPixels2Radius();
+
+    if (distanceKm > this.fpvRenderOptions.rangeKm) {
+      return [0, 0, 0, 0];
+    }
+
+    const rangeKm = Math.max(this.fpvRenderOptions.rangeKm, 0.1);
+    const normalizedDistance = Math.min(1, distanceKm / rangeKm);
+    const brightness = Math.max(0.22, 1 - Math.sqrt(normalizedDistance) * 0.78);
+    const alpha = Math.max(0.08, 1 - normalizedDistance * 0.92);
+
+    return [brightness, brightness, brightness, alpha];
+  }
+
+  private isExcludedFpvSatellite (satIdx: number): boolean {
+    if (satIdx === this.fpvRenderOptions.excludedSatelliteIndex) {
+      return true;
+    }
+
+    const satellite = this.satelliteStore?.getSatellite(satIdx);
+
+    if (!satellite) {
+      return false;
+    }
+
+    if (this.fpvRenderOptions.excludedSatelliteObjectId && satellite.OBJECT_ID === this.fpvRenderOptions.excludedSatelliteObjectId) {
+      return true;
+    }
+
+    return Boolean(
+      this.fpvRenderOptions.excludedSatelliteNoradCatId
+      && satellite.NORAD_CAT_ID === this.fpvRenderOptions.excludedSatelliteNoradCatId
+    );
   }
 
   /**
@@ -191,7 +253,7 @@ class Satellites implements SceneComponent, SelectableSatellite {
       this.satAlt = new Float32Array(message.data.satAlt);
 
       this.satelliteStore.setPositionalData(
-        this.satVel, this.satPos, this.satAlt
+        this.satVel, this.satPos, this.satAlt, message.data.simulationTimeMs
       );
 
       if (!this.cruncherReady) {
@@ -227,6 +289,19 @@ class Satellites implements SceneComponent, SelectableSatellite {
     } else {
       this.currentColorScheme = new DefaultColorScheme();
     }
+  }
+
+  setTimeScale (timeScale: number) {
+    this.worker?.postMessage(JSON.stringify({
+      state: {
+        timeScale
+      }
+    }));
+  }
+
+  setFpvRenderOptions (options: FpvRenderOptions) {
+    this.fpvRenderOptions = options;
+    this.updateSatellitesMaterial(this.satelliteStore?.size() || 0, this.satelliteStore?.getSatData() || []);
   }
 
   getSatellitegroup (): SatelliteGroup | undefined {
@@ -296,7 +371,7 @@ class Satellites implements SceneComponent, SelectableSatellite {
       blendSrcAlpha: SrcAlphaFactor,
       blendDstAlpha: OneMinusSrcAlphaFactor,
       transparent: true,
-      alphaTest: 0.5,
+      alphaTest: 0.02,
       depthTest: true,
       depthWrite: false,
     });

@@ -5,6 +5,10 @@ body {
   overflow: hidden;
 }
 
+body.fpv-active #sat-infobox {
+  display: none !important;
+}
+
 a,.link {
   color: rgb(102, 190, 238);
   text-decoration: underline;
@@ -109,6 +113,126 @@ ul {
   border-radius: 5px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   pointer-events: none;
+}
+
+#fpv-panel {
+  position: absolute;
+  left: 12px;
+  top: 52px;
+  width: 300px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(180, 220, 255, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 0 24px rgba(0, 80, 160, 0.28);
+  color: white;
+  font-size: 12px;
+  padding: 12px;
+  z-index: 12;
+  backdrop-filter: blur(5px);
+}
+
+.fpv-panel-header {
+  color: #a9d9ff;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+#fpv-panel label {
+  color: #cbd8e6;
+  display: block;
+  margin-bottom: 8px;
+}
+
+#fpv-panel input,
+#fpv-panel select,
+#fpv-panel button {
+  background: rgba(10, 20, 32, 0.95);
+  border: 1px solid rgba(180, 220, 255, 0.28);
+  border-radius: 4px;
+  color: white;
+  font-family: 'Droid Sans', sans-serif;
+}
+
+#fpv-panel input,
+#fpv-panel select {
+  box-sizing: border-box;
+  display: block;
+  margin-top: 4px;
+  padding: 5px;
+  width: 100%;
+}
+
+.fpv-toggle {
+  align-items: center;
+  display: flex !important;
+  gap: 8px;
+}
+
+.fpv-toggle input {
+  display: inline-block !important;
+  margin: 0 !important;
+  width: auto !important;
+}
+
+.fpv-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 8px;
+}
+
+.fpv-grid.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.fpv-button-group {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 8px 0;
+}
+
+.fpv-button-group button {
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.fpv-button-group button.selected {
+  background: #2c8bdc;
+  border-color: #9ed5ff;
+  box-shadow: 0 0 8px rgba(80, 170, 255, 0.55);
+}
+
+.fpv-readouts {
+  border-top: 1px solid rgba(180, 220, 255, 0.18);
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.fpv-readouts div {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.fpv-readouts span {
+  color: #93a4b8;
+}
+
+.fpv-readouts strong {
+  color: #f3fbff;
+  font-weight: normal;
+  max-width: 170px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #sat-infobox {

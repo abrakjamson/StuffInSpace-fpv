@@ -18,6 +18,8 @@ import logger from '@/utils/logger';
 import { ArrowHelper, Raycaster, Vector2, Vector3 } from 'three';
 import { SatelliteObject } from './interfaces/SatelliteObject';
 import { ViewerContext } from './interfaces/ViewerContext';
+import { FpvController } from './fpv/FpvController';
+import { FpvStateSnapshot } from './fpv/types';
 
 class Viewer {
   config: Record<string, any> = {
@@ -48,6 +50,7 @@ class Viewer {
   satellites?: Satellites;
   orbits?: Orbits;
   earth?: Earth;
+  fpvController?: FpvController;
   mouseMoved = false;
   targetZoom = 5;
   minZoomLevel = 1;
@@ -249,7 +252,10 @@ class Viewer {
       this.camera.zoom = 1;
       this.context.camera = this.camera;
 
-      this.renderer = new WebGLRenderer({ antialias: true });
+      this.renderer = new WebGLRenderer({
+        antialias: true,
+        preserveDrawingBuffer: new URLSearchParams(window.location.search).has('fpvTest')
+      });
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       document
@@ -301,6 +307,16 @@ class Viewer {
       await this.registerSceneComponent('satellites', this.satellites);
       this.orbits = new Orbits();
       await this.registerSceneComponent('orbits', this.orbits);
+      this.fpvController = new FpvController();
+      this.fpvController.init({
+        camera: this.camera,
+        controls: this.controls,
+        scene: this.scene,
+        satelliteStore: this.satelliteStore,
+        satellites: this.satellites,
+        onTimeScaleChange: (timeScale) => this.satellites?.setTimeScale(timeScale),
+        onStateChange: (state) => this.eventManager.fireEvent('fpvStateChange', state)
+      });
 
       const centrePoint = this.getCenterPoint(this.earth);
       if (centrePoint) {
@@ -322,6 +338,8 @@ class Viewer {
 
   animate () {
     requestAnimationFrame(this.animate.bind(this));
+
+    this.fpvController?.update();
 
     for (const component of this.sceneComponents) {
       component.update(this.scene);
@@ -433,6 +451,30 @@ class Viewer {
 
   addEventListener (eventName: string, listener: any) {
     this.eventManager.addEventListener(eventName, listener);
+  }
+
+  setFpvEnabled (enabled: boolean) {
+    this.fpvController?.setEnabled(enabled);
+  }
+
+  setFpvObserverMode (mode: string) {
+    this.fpvController?.setObserverMode(mode);
+  }
+
+  setFpvCustomOrbit (altitudeKm: number, inclinationDeg: number, raanDeg: number) {
+    this.fpvController?.setCustomOrbit({ altitudeKm, inclinationDeg, raanDeg });
+  }
+
+  setFpvTimeScale (timeScale: number) {
+    this.fpvController?.setTimeScale(timeScale);
+  }
+
+  setFpvRangeKm (rangeKm: number) {
+    this.fpvController?.setRangeKm(rangeKm);
+  }
+
+  getFpvState (): FpvStateSnapshot | undefined {
+    return this.fpvController?.getSnapshot();
   }
 }
 

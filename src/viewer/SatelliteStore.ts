@@ -48,6 +48,7 @@ class SatelliteStore {
   satelliteVelocities: Float32Array = new Float32Array();
   satellitePositions: Float32Array = new Float32Array();
   satelliteAltitudes: Float32Array = new Float32Array();
+  simulationTimeMs = Date.now();
   gotExtraData = false;
   gotPositionalData = false;
   loaded = false;
@@ -303,10 +304,18 @@ class SatelliteStore {
     }
   }
 
-  setPositionalData (satelliteVelocities: Float32Array, satellitePositions: Float32Array, satelliteAltitudes: Float32Array) {
+  setPositionalData (
+    satelliteVelocities: Float32Array,
+    satellitePositions: Float32Array,
+    satelliteAltitudes: Float32Array,
+    simulationTimeMs?: number
+  ) {
     this.satelliteVelocities = satelliteVelocities;
     this.satellitePositions = satellitePositions;
     this.satelliteAltitudes = satelliteAltitudes;
+    if (simulationTimeMs !== undefined) {
+      this.simulationTimeMs = simulationTimeMs;
+    }
     this.gotPositionalData = true;
   }
 
@@ -316,7 +325,7 @@ class SatelliteStore {
       return [
         this.satellitePositions[offset],
         this.satellitePositions[offset + 1],
-        this.satellitePositions[offset + 3]
+        this.satellitePositions[offset + 2]
       ];
     }
     return undefined;
@@ -330,12 +339,28 @@ class SatelliteStore {
     return this.satellitePositions;
   }
 
+  getSatPos () {
+    return this.satellitePositions;
+  }
+
   getAltitudes () {
+    return this.satelliteAltitudes;
+  }
+
+  getSatAlt () {
     return this.satelliteAltitudes;
   }
 
   getVelocitities () {
     return this.satelliteVelocities;
+  }
+
+  getSatVel () {
+    return this.satelliteVelocities;
+  }
+
+  getSimulationTimeMs () {
+    return this.simulationTimeMs;
   }
 
   size (): number {

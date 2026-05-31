@@ -6,6 +6,7 @@ const Events = {
   selectedSatChange: 'selectedSatChange',
   satHover: 'sathoverChange',
   satDataLoaded: 'satdataloaded',
+  fpvStateChange: 'fpvStateChange',
   closeWindow: 'closeWindow',
   cruncherReady: 'cruncherReady'
 };

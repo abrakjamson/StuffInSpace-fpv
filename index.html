@@ -47,6 +47,61 @@
       </ul>
     </div>
 
+    <div id="fpv-panel" data-testid="fpv-panel">
+      <div class="fpv-panel-header">LEO first-person view</div>
+      <label class="fpv-toggle">
+        <input type="checkbox" id="fpv-enabled" data-testid="fpv-enabled" />
+        Enable FPV camera
+      </label>
+
+      <label>
+        Anchor
+        <select id="fpv-mode" data-testid="fpv-mode">
+          <option value="custom">Custom circular LEO</option>
+          <option value="iss">Ride along with ISS</option>
+        </select>
+      </label>
+
+      <div class="fpv-grid" id="fpv-custom-controls">
+        <label>
+          Altitude
+          <input id="fpv-altitude" data-testid="fpv-altitude" type="number" min="120" max="2000" step="1" value="420" />
+        </label>
+        <label>
+          Inclination
+          <input id="fpv-inclination" data-testid="fpv-inclination" type="number" min="0" max="180" step="0.1" value="51.6" />
+        </label>
+        <label>
+          RAAN
+          <input id="fpv-raan" data-testid="fpv-raan" type="number" min="0" max="360" step="0.1" value="0" />
+        </label>
+      </div>
+
+      <div class="fpv-button-group" aria-label="time speed">
+        <button type="button" class="fpv-speed selected" data-speed="1" data-testid="fpv-speed-1">1x</button>
+        <button type="button" class="fpv-speed" data-speed="10" data-testid="fpv-speed-10">10x</button>
+        <button type="button" class="fpv-speed" data-speed="100" data-testid="fpv-speed-100">100x</button>
+        <button type="button" class="fpv-speed" data-speed="1000" data-testid="fpv-speed-1000">1000x</button>
+      </div>
+
+      <div class="fpv-button-group" aria-label="distance filter">
+        <button type="button" class="fpv-range selected" data-range="100" data-testid="fpv-range-100">100 km</button>
+        <button type="button" class="fpv-range" data-range="10" data-testid="fpv-range-10">10 km</button>
+        <button type="button" class="fpv-range" data-range="1" data-testid="fpv-range-1">1 km</button>
+        <button type="button" class="fpv-range" data-range="0.1" data-testid="fpv-range-100m">100 m</button>
+      </div>
+
+      <div class="fpv-readouts">
+        <div><span>Observer</span><strong id="fpv-observer" data-testid="fpv-observer">Custom LEO observer</strong></div>
+        <div><span>Nearest</span><strong id="fpv-nearest" data-testid="fpv-nearest">Waiting for data</strong></div>
+        <div><span>Within 1 km</span><strong id="fpv-count-1" data-testid="fpv-count-1">0</strong></div>
+        <div><span>Within 10 km</span><strong id="fpv-count-10" data-testid="fpv-count-10">0</strong></div>
+        <div><span>Within 100 km</span><strong id="fpv-count-100" data-testid="fpv-count-100">0</strong></div>
+        <div><span>Relative speed</span><strong id="fpv-relative-velocity" data-testid="fpv-relative-velocity">--</strong></div>
+        <div><span>Next &lt;1 km</span><strong id="fpv-next-pass" data-testid="fpv-next-pass">No pass predicted</strong></div>
+      </div>
+    </div>
+
     <div id="sat-hoverbox" style="display: none">(none)</div>
     <div id="sat-infobox" class="drag-zone">
       <div id="sat-info-title">This is a title</div>
@@ -157,6 +212,9 @@
         <li>
           Left click to select an object
         </li>
+        <li>
+          Enable LEO first-person view to ride a circular orbit or the ISS, then use time warp and range filters to compare how empty space looks with how rare close passes still matter.
+        </li>
       </ul>
     </div>
     </div>
@@ -175,6 +233,8 @@
       </p>
 
       <p>Stuff in Space is a realtime 3D map of objects in Earth orbit, visualized using WebGL.</p>
+
+      <p>The LEO first-person view is an educational visualization. Its nearest-object, relative-speed, and next-pass readouts are based on catalog TLE propagation and coarse visual estimates, not operational conjunction assessment.</p>
 
       <p>The website updates daily with orbit data from <a href="http://www.space-track.org">Space-Track.org</a>
       and uses the excellent <a href="https://github.com/shashwatak/satellite-js">satellite.js</a> Javascript library
@@ -198,4 +258,3 @@
   </div>
   </body>
 </html>
-

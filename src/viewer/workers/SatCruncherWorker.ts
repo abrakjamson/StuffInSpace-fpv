@@ -12,9 +12,35 @@ let satVel: Float32Array;
 let satAlt: Float32Array;
 let running = true;
 let timer: number;
+let simulationTimeMs = Date.now();
+let lastWallTimeMs = Date.now();
+let timeScale = 1;
+
+function advanceSimulationClock () {
+  const wallTimeMs = Date.now();
+  const elapsedWallMs = Math.max(0, wallTimeMs - lastWallTimeMs);
+  simulationTimeMs += elapsedWallMs * timeScale;
+  lastWallTimeMs = wallTimeMs;
+  return new Date(simulationTimeMs);
+}
+
+function setSimulationState (state: Record<string, any>) {
+  advanceSimulationClock();
+
+  if (Number.isFinite(state.simulationTimeMs)) {
+    simulationTimeMs = state.simulationTimeMs;
+  }
+
+  if (Number.isFinite(state.timeScale)) {
+    timeScale = Math.max(0, state.timeScale);
+    logger.debug(`Worker time scale set to ${timeScale}x`);
+  }
+
+  lastWallTimeMs = Date.now();
+}
 
 function propagate () {
-  const now = new Date();
+  const now = advanceSimulationClock();
   let j = jday(
     now.getUTCFullYear(),
     now.getUTCMonth() + 1, // Note, this function requires months in range 1-12.
@@ -66,7 +92,8 @@ function propagate () {
     {
       satPos: satPos.buffer,
       satVel: satVel.buffer,
-      satAlt: satAlt.buffer
+      satAlt: satAlt.buffer,
+      simulationTimeMs
     }
     // [satPos.buffer, satVel.buffer, satAlt.buffer]
   );
@@ -106,6 +133,8 @@ onmessage = function (message) {
         }
       }
       if (satData.state) {
+        setSimulationState(satData.state);
+
         if (typeof satData.state.running === 'boolean') {
           running = satData.state.running;
           logger.debug(`Worker set to running === ${running}`);
