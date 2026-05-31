@@ -14,6 +14,7 @@ export interface FpvSettings {
     raanDeg: number;
     timeScale: FpvTimeScale;
     rangeKm: FpvRangeKm;
+    dustEnabled: boolean;
 }
 
 export interface ObserverState {
@@ -23,6 +24,7 @@ export interface ObserverState {
     satelliteObjectId?: string;
     satelliteNoradCatId?: string;
     altitudeKm: number;
+    earthAngularDiameterDeg: number;
     scenePosition: Vector3;
     sceneVelocityKmSec: Vector3;
     radialUp: Vector3;
@@ -52,6 +54,7 @@ export interface FpvRenderOptions {
     excludedSatelliteIndex?: number;
     excludedSatelliteObjectId?: string;
     excludedSatelliteNoradCatId?: string;
+    dustEnabled: boolean;
 }
 
 export interface FpvStateSnapshot {
@@ -59,6 +62,7 @@ export interface FpvStateSnapshot {
     observer: {
         label: string;
         altitudeKm: number;
+        earthAngularDiameterDeg: number;
         mode: FpvObserverMode;
         satelliteObjectId?: string;
         satelliteNoradCatId?: string;
@@ -67,5 +71,9 @@ export interface FpvStateSnapshot {
     look: {
         yawDeg: number;
         pitchDeg: number;
+    };
+    dust: {
+        enabled: boolean;
+        countWithinView: number;
     };
 }

@@ -6,6 +6,7 @@ import {
   TextureLoader,
   Color,
   ShaderMaterial,
+  Texture,
   Object3D,
   OneMinusSrcAlphaFactor,
   SrcAlphaFactor,
@@ -24,6 +25,7 @@ import GroupColorScheme from './color-schemes/GroupColorScheme';
 import { SatelliteObject } from './interfaces/SatelliteObject';
 import { ViewerContext } from './interfaces/ViewerContext';
 import { FpvRenderOptions } from './fpv/types';
+import { getDustViewDistanceKm, getSyntheticDustSamples } from './fpv/SyntheticDust';
 
 class Satellites implements SceneComponent, SelectableSatellite {
   baseUrl = '';
@@ -38,6 +40,10 @@ class Satellites implements SceneComponent, SelectableSatellite {
   cruncherReady = false;
   scene?: SatelliteOrbitScene;
   particles?: Points;
+  dustParticles?: Points;
+  dustGeometry?: BufferGeometry;
+  dustPositions?: Float32Array;
+  dustColors?: Float32Array;
   geometry?: BufferGeometry;
   satelliteStore?: SatelliteStore;
   shaderStore?: ShaderStore;
@@ -46,7 +52,8 @@ class Satellites implements SceneComponent, SelectableSatellite {
   hoverSatelliteIdx = -1;
   fpvRenderOptions: FpvRenderOptions = {
     enabled: false,
-    rangeKm: 'all'
+    rangeKm: 'all',
+    dustEnabled: false
   };
 
   setColorScheme (colorScheme: ColorScheme) {
@@ -303,6 +310,7 @@ class Satellites implements SceneComponent, SelectableSatellite {
   setFpvRenderOptions (options: FpvRenderOptions) {
     this.fpvRenderOptions = options;
     this.updateSatellitesMaterial(this.satelliteStore?.size() || 0, this.satelliteStore?.getSatData() || []);
+    this.updateDustParticles();
   }
 
   getSatellitegroup (): SatelliteGroup | undefined {
@@ -386,6 +394,8 @@ class Satellites implements SceneComponent, SelectableSatellite {
       this.scene.add( this.particles );
     }
 
+    this.initDustGeometry(shader, texture);
+
     // reduce CPU load by stopping the runner if the tab/window
     // is not visisble
     window.addEventListener('visibilitychange', () => {
@@ -395,6 +405,79 @@ class Satellites implements SceneComponent, SelectableSatellite {
         }
       }));
     });
+  }
+
+  private initDustGeometry (shader: { vertex: string, fragment: string }, texture: Texture) {
+    const sampleCount = getSyntheticDustSamples().length;
+    this.dustGeometry = new BufferGeometry();
+    this.dustPositions = new Float32Array(sampleCount * 3);
+    this.dustColors = new Float32Array(sampleCount * 4);
+    this.dustGeometry.setAttribute('position', new Float32BufferAttribute(this.dustPositions, 3));
+    this.dustGeometry.setAttribute('color', new Float32BufferAttribute(this.dustColors, 4));
+
+    const material = new ShaderMaterial({
+      uniforms: {
+        color: { value: new Color( 0xffffff ) },
+        pointTexture: { value: texture }
+      },
+      clipping: false,
+      vertexShader: shader.vertex,
+      fragmentShader: shader.fragment,
+      blending: CustomBlending,
+      blendSrcAlpha: SrcAlphaFactor,
+      blendDstAlpha: OneMinusSrcAlphaFactor,
+      transparent: true,
+      alphaTest: 0.01,
+      depthTest: true,
+      depthWrite: false,
+    });
+
+    this.dustParticles = new Points(this.dustGeometry, material);
+    this.dustParticles.frustumCulled = false;
+    this.dustParticles.visible = false;
+    this.scene?.add(this.dustParticles);
+  }
+
+  private updateDustParticles () {
+    if (!this.scene || !this.dustGeometry || !this.dustPositions || !this.dustColors || !this.fpvRenderOptions.observerPosition) {
+      return;
+    }
+
+    const samples = getSyntheticDustSamples();
+    const viewDistanceKm = getDustViewDistanceKm(this.fpvRenderOptions.rangeKm);
+    const kilometersPerSceneUnit = this.scene.getPixels2Radius();
+    const visible = this.fpvRenderOptions.enabled && this.fpvRenderOptions.dustEnabled;
+
+    if (this.dustParticles) {
+      this.dustParticles.visible = visible;
+    }
+
+    for (let i = 0; i < samples.length; i += 1) {
+      const positionOffset = i * 3;
+      const colorOffset = i * 4;
+      const sample = samples[i];
+      const isVisible = visible && sample.distanceKm <= viewDistanceKm;
+
+      if (isVisible) {
+        const sceneDistance = sample.distanceKm / kilometersPerSceneUnit;
+        this.dustPositions[positionOffset] = this.fpvRenderOptions.observerPosition.x + sample.direction.x * sceneDistance;
+        this.dustPositions[positionOffset + 1] = this.fpvRenderOptions.observerPosition.y + sample.direction.y * sceneDistance;
+        this.dustPositions[positionOffset + 2] = this.fpvRenderOptions.observerPosition.z + sample.direction.z * sceneDistance;
+      } else {
+        this.dustPositions[positionOffset] = 0;
+        this.dustPositions[positionOffset + 1] = 0;
+        this.dustPositions[positionOffset + 2] = 0;
+      }
+
+      this.dustColors[colorOffset] = 0.72 * sample.brightness;
+      this.dustColors[colorOffset + 1] = 0.84 * sample.brightness;
+      this.dustColors[colorOffset + 2] = sample.brightness;
+      this.dustColors[colorOffset + 3] = isVisible ? 0.16 : 0;
+    }
+
+    this.dustGeometry.attributes.position.needsUpdate = true;
+    this.dustGeometry.attributes.color.needsUpdate = true;
+    this.dustGeometry.computeBoundingSphere();
   }
 
   getObject3D (): Object3D | undefined {

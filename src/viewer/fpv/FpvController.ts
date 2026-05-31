@@ -19,6 +19,7 @@ import {
   ObserverState,
   ProximityMetrics,
 } from './types';
+import { countSyntheticDustWithinRange } from './SyntheticDust';
 
 declare global {
     interface Window {
@@ -69,6 +70,15 @@ export class FpvController {
     this.notifyStateChange();
   }
 
+  setDustEnabled (dustEnabled: boolean): void {
+    if (this.settings.dustEnabled === dustEnabled) {
+      return;
+    }
+
+    this.settings.dustEnabled = dustEnabled;
+    this.notifyStateChange();
+  }
+
   update (): void {
     if (!this.context) {
       return;
@@ -76,7 +86,7 @@ export class FpvController {
 
     if (!this.settings.enabled) {
       if (this.renderEnabled) {
-        this.setRenderOptions({ enabled: false, rangeKm: this.settings.rangeKm });
+        this.setRenderOptions({ enabled: false, rangeKm: this.settings.rangeKm, dustEnabled: this.settings.dustEnabled });
         this.renderEnabled = false;
       }
 
@@ -101,6 +111,7 @@ export class FpvController {
       excludedSatelliteIndex: observer.satelliteIndex,
       excludedSatelliteObjectId: observer.satelliteObjectId,
       excludedSatelliteNoradCatId: observer.satelliteNoradCatId,
+      dustEnabled: this.settings.dustEnabled,
     });
     this.renderEnabled = true;
 
@@ -188,6 +199,7 @@ export class FpvController {
         ? {
           label: this.observer.label,
           altitudeKm: this.observer.altitudeKm,
+          earthAngularDiameterDeg: this.observer.earthAngularDiameterDeg,
           mode: this.observer.mode,
           satelliteObjectId: this.observer.satelliteObjectId,
           satelliteNoradCatId: this.observer.satelliteNoradCatId,
@@ -197,6 +209,10 @@ export class FpvController {
       look: {
         yawDeg: radToDeg(this.lookYawRad),
         pitchDeg: radToDeg(this.lookPitchRad),
+      },
+      dust: {
+        enabled: this.settings.dustEnabled,
+        countWithinView: this.settings.dustEnabled ? countSyntheticDustWithinRange(this.settings.rangeKm) : 0,
       },
     };
   }
@@ -236,7 +252,7 @@ export class FpvController {
     }
 
     this.context.camera.updateProjectionMatrix();
-    this.setRenderOptions({ enabled: false, rangeKm: this.settings.rangeKm });
+    this.setRenderOptions({ enabled: false, rangeKm: this.settings.rangeKm, dustEnabled: this.settings.dustEnabled });
     this.renderEnabled = false;
   }
 

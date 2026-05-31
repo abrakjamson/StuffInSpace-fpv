@@ -129,6 +129,53 @@ test.describe("FPV space-crowding view", () => {
     }).toBe("all");
   });
 
+  test("changes Earth angular size when altitude changes", async ({ page }) => {
+    await openReadyApp(page);
+    await page.waitForFunction(() => (window as any).__stuffInSpaceFpv?.observer !== null);
+
+    await page.getByTestId("fpv-altitude").fill("120");
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.observer?.earthAngularDiameterDeg ?? 0
+    ))).toBeGreaterThan(150);
+    const lowAltitudeDiameter = await page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.observer?.earthAngularDiameterDeg ?? 0
+    ));
+
+    await page.getByTestId("fpv-altitude").fill("2000");
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.observer?.earthAngularDiameterDeg ?? 999
+    ))).toBeLessThan(lowAltitudeDiameter - 20);
+  });
+
+  test("shows synthetic dust separately within the selected view distance", async ({ page }) => {
+    await openReadyApp(page);
+
+    await expect(page.getByTestId("fpv-dust-count")).toHaveText("Off");
+    await page.getByTestId("fpv-dust-enabled").check();
+
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.dust?.countWithinView ?? 0
+    ))).toBeGreaterThan(2000);
+
+    const allDustCount = await page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.dust?.countWithinView ?? 0
+    ));
+
+    await page.getByTestId("fpv-range-100").click();
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.dust?.countWithinView ?? 0
+    ))).toBeLessThan(allDustCount);
+    const hundredKmDustCount = await page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.dust?.countWithinView ?? 0
+    ));
+
+    await page.getByTestId("fpv-range-100m").click();
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__stuffInSpaceFpv?.dust?.countWithinView ?? 0
+    ))).toBeLessThan(hundredKmDustCount);
+    await expect(page.getByTestId("fpv-dust-count")).not.toHaveText("Off");
+  });
+
   test("changes FPV pitch by dragging the canvas vertically", async ({ page }) => {
     await openReadyApp(page);
     await page.waitForFunction(() => (window as any).__stuffInSpaceFpv?.observer !== null);

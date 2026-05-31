@@ -464,8 +464,12 @@ class Viewer {
     this.fpvController?.setTimeScale(timeScale);
   }
 
-  setFpvRangeKm (rangeKm: number) {
+  setFpvRangeKm (rangeKm: string | number) {
     this.fpvController?.setRangeKm(rangeKm);
+  }
+
+  setFpvDustEnabled (dustEnabled: boolean) {
+    this.fpvController?.setDustEnabled(dustEnabled);
   }
 
   getFpvState (): FpvStateSnapshot | undefined {

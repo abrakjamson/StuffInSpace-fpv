@@ -265,6 +265,7 @@ function initFpvControls () {
   const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
   const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
   const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
+  const dustInput = document.querySelector<HTMLInputElement>('#fpv-dust-enabled');
 
   if (!modeSelect || !altitudeInput || !inclinationInput || !raanInput) {
     return;
@@ -284,8 +285,15 @@ function initFpvControls () {
   });
 
   altitudeInput.addEventListener('change', applyCustomOrbit);
+  altitudeInput.addEventListener('input', applyCustomOrbit);
   inclinationInput.addEventListener('change', applyCustomOrbit);
+  inclinationInput.addEventListener('input', applyCustomOrbit);
   raanInput.addEventListener('change', applyCustomOrbit);
+  raanInput.addEventListener('input', applyCustomOrbit);
+
+  dustInput?.addEventListener('change', () => {
+    viewer.setFpvDustEnabled(dustInput.checked);
+  });
 
   Array.from(document.querySelectorAll<HTMLButtonElement>('.fpv-speed')).forEach((button) => {
     button.addEventListener('click', () => {
@@ -311,6 +319,7 @@ function onFpvStateChange (state: FpvStateSnapshot) {
   const altitudeInput = document.querySelector<HTMLInputElement>('#fpv-altitude');
   const inclinationInput = document.querySelector<HTMLInputElement>('#fpv-inclination');
   const raanInput = document.querySelector<HTMLInputElement>('#fpv-raan');
+  const dustInput = document.querySelector<HTMLInputElement>('#fpv-dust-enabled');
 
   if (modeSelect) {
     modeSelect.value = state.settings.mode;
@@ -320,6 +329,10 @@ function onFpvStateChange (state: FpvStateSnapshot) {
   syncNumberInput(altitudeInput, state.settings.altitudeKm.toFixed(0));
   syncNumberInput(inclinationInput, state.settings.inclinationDeg.toFixed(1));
   syncNumberInput(raanInput, state.settings.raanDeg.toFixed(1));
+
+  if (dustInput) {
+    dustInput.checked = state.dust.enabled;
+  }
 
   document.body.classList.toggle('fpv-active', state.settings.enabled);
   setSelectedButton('.fpv-speed', 'speed', String(state.settings.timeScale));
@@ -332,6 +345,7 @@ function onFpvStateChange (state: FpvStateSnapshot) {
   setHtml('#fpv-count-100', state.metrics.countWithin100Km.toLocaleString());
   setHtml('#fpv-relative-velocity', formatNumber(state.metrics.nearestRelativeVelocityKmSec, 'km/s'));
   setHtml('#fpv-next-pass', formatNextPass(state));
+  setHtml('#fpv-dust-count', state.dust.enabled ? state.dust.countWithinView.toLocaleString() : 'Off');
 }
 
 function syncNumberInput (input: HTMLInputElement | null, value: string) {

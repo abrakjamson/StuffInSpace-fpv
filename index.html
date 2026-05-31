@@ -83,6 +83,11 @@
         <button type="button" class="fpv-range" data-range="0.1" data-testid="fpv-range-100m">100 m</button>
       </div>
 
+      <label class="fpv-toggle">
+        <input type="checkbox" id="fpv-dust-enabled" data-testid="fpv-dust-enabled" />
+        Dust mode: show synthetic mm-scale debris
+      </label>
+
       <div class="fpv-readouts">
         <div><span>Observer</span><strong id="fpv-observer" data-testid="fpv-observer">Custom LEO observer</strong></div>
         <div><span>Nearest</span><strong id="fpv-nearest" data-testid="fpv-nearest">Waiting for data</strong></div>
@@ -91,6 +96,7 @@
         <div><span>Within 100 km</span><strong id="fpv-count-100" data-testid="fpv-count-100">0</strong></div>
         <div><span>Relative speed</span><strong id="fpv-relative-velocity" data-testid="fpv-relative-velocity">--</strong></div>
         <div><span>Next &lt;1 km</span><strong id="fpv-next-pass" data-testid="fpv-next-pass">No pass predicted</strong></div>
+        <div><span>Dust in view</span><strong id="fpv-dust-count" data-testid="fpv-dust-count">Off</strong></div>
       </div>
     </div>
 

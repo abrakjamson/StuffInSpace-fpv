@@ -14,6 +14,7 @@ export const DEFAULT_FPV_SETTINGS: FpvSettings = {
   raanDeg: 0,
   timeScale: 1,
   rangeKm: 'all',
+  dustEnabled: false,
 };
 
 export function scenePositionFromKm (positionKm: Vector3, kilometersPerSceneUnit: number): Vector3 {
@@ -152,10 +153,19 @@ function createObserverState (
     satelliteObjectId: satellite?.OBJECT_ID,
     satelliteNoradCatId: satellite?.NORAD_CAT_ID,
     altitudeKm: Math.max(0, scenePosition.length() * kilometersPerSceneUnit - EARTH_RADIUS_KM),
+    earthAngularDiameterDeg: computeEarthAngularDiameterDeg(scenePosition.length() * kilometersPerSceneUnit),
     scenePosition,
     sceneVelocityKmSec,
     radialUp,
     cameraForward,
     cameraUp,
   };
+}
+
+function computeEarthAngularDiameterDeg (orbitalRadiusKm: number): number {
+  if (orbitalRadiusKm <= EARTH_RADIUS_KM) {
+    return 180;
+  }
+
+  return 2 * Math.asin(EARTH_RADIUS_KM / orbitalRadiusKm) * 180 / Math.PI;
 }
