@@ -38,7 +38,7 @@ interface FpvControllerContext {
 }
 
 const ALLOWED_TIME_SCALES: FpvTimeScale[] = [1, 10, 100, 1000];
-const ALLOWED_RANGES: FpvRangeKm[] = ['all', 0.1, 10];
+const ALLOWED_RANGES: FpvRangeKm[] = ['all', 0.1, 100];
 const METRICS_INTERVAL_MS = 250;
 const LOOK_SENSITIVITY_RAD_PER_PIXEL = 0.003;
 const MAX_PITCH_RAD = Math.PI * 0.45;

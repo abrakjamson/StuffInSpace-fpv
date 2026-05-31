@@ -4,7 +4,7 @@ export type FpvObserverMode = 'custom' | 'iss';
 
 export type FpvTimeScale = 1 | 10 | 100 | 1000;
 
-export type FpvRangeKm = 'all' | 0.1 | 10;
+export type FpvRangeKm = 'all' | 0.1 | 100;
 
 export interface FpvSettings {
     enabled: boolean;

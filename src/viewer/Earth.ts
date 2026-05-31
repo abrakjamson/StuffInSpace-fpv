@@ -282,7 +282,7 @@ class Earth extends Group implements SceneComponent {
   static NAME = 'Earth3d';
   earthDayTexture = 'images/8081_earthmap4k.jpg';
   earthNightTexture = 'images/8081_earthlights4k.jpg';
-  baseUrl = '/StuffInSpace/';
+  baseUrl = '/';
   camera?: THREE.Camera;
   ground: Mesh;
   sky: Mesh;
@@ -410,6 +410,8 @@ class Earth extends Group implements SceneComponent {
   }
 
   loadTextures (texDay: Texture, texNight: Texture, maxAnisotropy = 16) {
+    texDay.colorSpace = THREE.SRGBColorSpace;
+    texNight.colorSpace = THREE.SRGBColorSpace;
     texDay.anisotropy = maxAnisotropy;
     texNight.anisotropy = maxAnisotropy;
     AtmUniforms.tDiffuse.value = texDay;
@@ -424,6 +426,7 @@ class Earth extends Group implements SceneComponent {
     }
 
     const texldr = new THREE.TextureLoader();
+    this.baseUrl = context.config?.baseUrl || this.baseUrl;
     const diffuse = texldr.load(`${this.baseUrl}${this.earthDayTexture}`);
     const diffuseNight = texldr.load(`${this.baseUrl}${this.earthNightTexture}`);
     this.loadTextures(diffuse,diffuseNight);
